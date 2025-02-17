@@ -193,10 +193,11 @@ void init_adc_tunerboard()
     setup_gpio_output(GPIO_BUTTON_LIGHT_2);
     setup_gpio_output(GPIO_BUTTON_LIGHT_3);
 
-    gpio_set_level(GPIO_BUTTON_LIGHT_0, 0);
-    gpio_set_level(GPIO_BUTTON_LIGHT_1, 0);
-    gpio_set_level(GPIO_BUTTON_LIGHT_2, 0);
-    gpio_set_level(GPIO_BUTTON_LIGHT_3, 0);
+    // Turn all lights on at start up
+    gpio_set_level(GPIO_BUTTON_LIGHT_0, 1);
+    gpio_set_level(GPIO_BUTTON_LIGHT_1, 1);
+    gpio_set_level(GPIO_BUTTON_LIGHT_2, 1);
+    gpio_set_level(GPIO_BUTTON_LIGHT_3, 1);
 
 
 //    setup_gpio_output(GPIO_ONBOARD_LED);
@@ -608,9 +609,6 @@ int search_lowest_SWR(int32_t* val_l, int32_t* val_c, int32_t* val_p, double* va
   *val_l = lowest_ind;
   *val_c = lowest_cap;
   *val_p = cposition;
-  *val_swr = swr;
-
+   
   return 0;
 }
-
-

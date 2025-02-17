@@ -325,9 +325,24 @@ void vTaskErrorDisplay(void *pvParameters)
             else {
                 error_status = 0;
                 gpio_set_level(gpio_lights[antenna], 0);
-                esp_mqtt_client_publish(client, "MY_AUTO_TUNER_1/Tuned", "off", 0, 0, 0);            }
+                esp_mqtt_client_publish(client, "MY_AUTO_TUNER_1/Tuned", "off", 0, 0, 0);            
+            }
+            vTaskDelay(pdMS_TO_TICKS(200));
+
         }
-        vTaskDelay(pdMS_TO_TICKS(200));
+        if (mem_error[antenna] ==2) {
+            if (error_status ==0) {
+                error_status = 1;
+                gpio_set_level(gpio_lights[antenna], 1);
+                esp_mqtt_client_publish(client, "MY_AUTO_TUNER_1/Tuned", "on", 0, 0, 0);            }
+            else {
+                error_status = 0;
+                gpio_set_level(gpio_lights[antenna], 0);
+                esp_mqtt_client_publish(client, "MY_AUTO_TUNER_1/Tuned", "off", 0, 0, 0);            
+            }
+            vTaskDelay(pdMS_TO_TICKS(1000));
+        }
+
         if (client == NULL) continue;
     }
 }
@@ -490,12 +505,16 @@ void process_long_button(int button_num)
         }
         else if (tready == 1)
         {
-            mem_error[antenna] = 0;            
-            mem_calibrated[antenna] = 1;
+            printf("Tuning fails because of too litte power \n");
+            mem_error[antenna] = 2;            
+            mem_calibrated[antenna] = 0;
             make_chan_online_if_calibrated(antenna);
         }
         else {
-            printf("Tuning fails because to little or too much power \n");
+            printf("Tuning fails because of too much power \n");
+            mem_error[antenna] = 1;            
+            mem_calibrated[antenna] = 0;
+            make_chan_online_if_calibrated(antenna);
         }
         close_tuning_mode();
         esp_mqtt_client_publish(client, "MY_AUTO_TUNER_1/Tuning", "off", 0, 0, 0);    
