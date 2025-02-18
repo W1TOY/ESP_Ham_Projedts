@@ -209,6 +209,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
         publish_selected_antenna(antenna);
 
         vTaskDelay(pdMS_TO_TICKS(500));
+        break;
     case MQTT_EVENT_DATA:
 //        ESP_LOGI(TAG, "MQTT_EVENT_DATA");
 //        printf("TOPIC=%.*s\r\n", event->topic_len, event->topic);
