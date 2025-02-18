@@ -33,3 +33,6 @@
 auto_tuner/.devcontainer/
 auto_tuner/sdkconfig.old
 auto_tuner/build/
+hf_switch_idf_x/.devcontainer/
+hf_switch_idf_x/build/
+hf_switch_idf_x/main/wifipassword.h

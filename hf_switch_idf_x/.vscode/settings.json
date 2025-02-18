@@ -1,0 +1,14 @@
+{
+    "C_Cpp.intelliSenseEngine": "default",
+    "idf.espIdfPathWin": "C:\\Users\\email\\esp\\v5.4\\esp-idf",
+    "idf.openOcdConfigs": [
+        "board/esp32s3-builtin.cfg"
+    ],
+    "idf.portWin": "COM8",
+    "idf.toolsPathWin": "C:\\Users\\email\\.espressif",
+    "idf.flashType": "UART",
+    "files.associations": {
+        "compare": "c",
+        "cstdint": "c"
+    }
+}
