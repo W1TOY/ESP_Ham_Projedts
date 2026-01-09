@@ -73,7 +73,11 @@ adc_oneshot_unit_handle_t adc1_handle;
 adc_oneshot_unit_init_cfg_t init_config1 = {
     .unit_id = ADC_UNIT_1,
 };
-adc_oneshot_chan_cfg_t config = {
+adc_oneshot_chan_cfg_t config_fwd = {
+    .atten = ADC_ATTEN_DB_12,
+    .bitwidth = ADC_BITWIDTH_12,
+};
+adc_oneshot_chan_cfg_t config_ref = {
     .atten = ADC_ATTEN_DB_12,
     .bitwidth = ADC_BITWIDTH_12,
 };
@@ -98,14 +102,21 @@ double read_ref()
     aref = aref / (double)NUM_ADC_READ;
     return aref;
 }
+double read_fwd()
+{
+    int aread = 0;
+    double aref = 0;
+    for (int i=0; i< NUM_ADC_READ; i++) { 
+      ESP_ERROR_CHECK(adc_oneshot_read(adc1_handle, ADC_CHANNEL_FWD, &aread)); 
+      aref += aread;
+//      printf("each read = %d \n", aread);
+    }
+    aref = aref / (double)NUM_ADC_READ;
+    return aref;
+}
 
 double get_swr()
 {
-    // some unknown problem with this particular relay settings at high frequency, so avoid it.
-//    if (check_value_l == 0 && check_value_c == 0 && check_value_p == 1)
-//    {
-//      return 10000.0;
-//    }
     return read_ref();
 }
 
@@ -114,40 +125,6 @@ double get_swr()
 // this function measured swr continusously and stop reading if value becomes consistent within 5%
 // hoping that this saves total tuning time
 //**************************************************************************** 
-
-double get_swr_adaptive_settling()
-{
-    // bypass adaptive algorithm
-    vTaskDelay(pdMS_TO_TICKS(RELAY_SETTLING_TIME));
-    return get_swr();
-
-    // wait for min time
-    vTaskDelay(pdMS_TO_TICKS(RELAY_SETTLING_TIME_MIN));   // wait for minimum time first
-    double ref_n = 0;
-    double ref_p = -1000;
-    double ref_pp = -2000;
-    int delay_delta = 2;
-    for (int delay = 0; delay < RELAY_SETTLING_TIME; delay+=delay_delta)
-    {
-        vTaskDelay(pdMS_TO_TICKS(delay_delta));
-        ref_n = get_swr();
-        double ref_delta_1 = ref_n - ref_p;
-        double ref_delta_2 = ref_n - ref_pp;
-        if (ref_n == 0) ref_n = 1;
-
-        if (ref_delta_1 < 0) ref_delta_1 = - ref_delta_1;
-        if (ref_delta_2 < 0) ref_delta_2 = - ref_delta_2;
-        if ((ref_delta_1 / ref_n) < 0.05 && (ref_delta_2 / ref_n) < 0.05 ) {
-            break;
-        }
-        ref_pp = ref_p;
-        ref_p = ref_n;
-
-    }
-
-    return ref_n;
-}
-
 
 
 //*************************************************************************** 
@@ -162,17 +139,9 @@ void setup_gpio_input(int pinnum)
 
 void setup_gpio_output(int pinnum)
 {
+  gpio_reset_pin((gpio_num_t)pinnum);
   gpio_set_drive_capability((gpio_num_t)pinnum, GPIO_DRIVE_CAP_DEFAULT);
   gpio_set_direction((gpio_num_t)pinnum, GPIO_MODE_OUTPUT);
-/*  
-    gpio_config_t io_conf = {};
-    io_conf.intr_type = GPIO_INTR_DISABLE;
-    io_conf.mode = GPIO_MODE_OUTPUT;
-    io_conf.pin_bit_mask = 1 << pinnum;
-    io_conf.pull_down_en = 0;
-    io_conf.pull_up_en = 0;
-    gpio_config(&io_conf);
-*/  
 }
 
 void init_adc_tunerboard()
@@ -221,9 +190,13 @@ void init_adc_tunerboard()
     setup_gpio_output(GPIO_SER_IN);
     gpio_set_level(GPIO_SER_IN, 0);
 
+    set_LC(0,0,0);
+    enable_shift_register_output();
+
     // adc init
     ESP_ERROR_CHECK(adc_oneshot_new_unit(&init_config1, &adc1_handle));
-    ESP_ERROR_CHECK(adc_oneshot_config_channel(adc1_handle, ADC_CHANNEL_REF, &config));
+    ESP_ERROR_CHECK(adc_oneshot_config_channel(adc1_handle, ADC_CHANNEL_FWD, &config_fwd));
+    ESP_ERROR_CHECK(adc_oneshot_config_channel(adc1_handle, ADC_CHANNEL_REF, &config_ref));
 }
 
 
@@ -236,8 +209,9 @@ void shift_one_bit(uint32_t bit_in)
       gpio_set_level(GPIO_SER_IN, 0);
     else 
       gpio_set_level(GPIO_SER_IN, 1);
-
+    esp_rom_delay_us(2);
     gpio_set_level(GPIO_SRCK, 1);
+    esp_rom_delay_us(2);
     gpio_set_level(GPIO_SRCK, 0);
 
 }
@@ -254,13 +228,19 @@ void disable_shift_register_output()
   gpio_set_level(GPIO_OUT_EN_N, 1);
 }
 
-void enable_shift_register_output()
+void transfer_shift_register_output()
 {
   gpio_set_level(GPIO_RCK, 1);
+  esp_rom_delay_us(2);
   gpio_set_level(GPIO_RCK, 0);
+}
+void enable_shift_register_output()
+{
   gpio_set_level(GPIO_OUT_EN_N, 0);
 
 }
+
+
 
 void send_value_to_shift_registers(uint32_t valueRelay)
 {
@@ -293,7 +273,6 @@ void set_LC(uint32_t cposition, uint32_t valueL, uint32_t valueC)
   check_value_p = cposition;
 
 
-  disable_shift_register_output();
   uint32_t valueRelay = 0;
   if ((valueC & 0x40) != 0) valueRelay |= 0x02; 
   if ((valueC & 0x20) != 0) valueRelay |= 0x04; 
@@ -314,73 +293,46 @@ void set_LC(uint32_t cposition, uint32_t valueL, uint32_t valueC)
   if ((valueL & 0x01) != 0) valueRelay |= 0x8000; 
 
   send_value_to_shift_registers(valueRelay);
-  enable_shift_register_output();
-
+  transfer_shift_register_output();
 }
 
 //*************************************************************************** 
 // Relay test functions
 //*************************************************************************** 
-
-void vibrate_relay(uint32_t valueRelay)
-{
-  for (int i=0; i<64; i++)
-  {
-    disable_shift_register_output();
-    send_value_to_shift_registers(0);
-    enable_shift_register_output();
-    vTaskDelay(pdMS_TO_TICKS(50));
-    disable_shift_register_output();
-    send_value_to_shift_registers(valueRelay);
-    enable_shift_register_output();
-    vTaskDelay(pdMS_TO_TICKS(50));
-  }
-}
 void vibrate_relay_lc(uint32_t cposition, uint32_t valueL, uint32_t valueC)
 {
   for (int i=0; i<32; i++)
   {
 
-    disable_shift_register_output();
     set_LC(0, 0, 0);
-    enable_shift_register_output();
-    vTaskDelay(pdMS_TO_TICKS(50));
-    disable_shift_register_output();
+    vTaskDelay(pdMS_TO_TICKS(10));
     set_LC(cposition, valueL, valueC);
-    enable_shift_register_output();
-    vTaskDelay(pdMS_TO_TICKS(50));
+    vTaskDelay(pdMS_TO_TICKS(10));
   }
-
 }
 
 void test_relay_lc_scan()
 {
-  for (int i=0; i<7; i++)
+ for (;;)
   {
-    printf("Turning on the relay C%d \n", i);
-    vibrate_relay_lc(0, 0, 1 << i);
-  } 
-  printf("Turning on C position \n");
-  vibrate_relay_lc(1, 0, 0);
-  for (int i=0; i<7; i++)
-  {
-    printf("Turning on the relay L%d \n", i);
-    vibrate_relay_lc(0, 1 << i, 0);
-  } 
 
+    for (int i=0; i<7; i++)
+    {
+      printf("Turning on the relay C%d \n", i);
+      vibrate_relay_lc(0, 0, 1 << i);
+    } 
+    printf("Turning on C position \n");
+    vibrate_relay_lc(1, 0, 0);
+    for (int i=0; i<7; i++)
+    {
+      printf("Turning on the relay L%d \n", i);
+      vibrate_relay_lc(0, 1 << i, 0);
+    } 
+    printf("Waiting for 10 secs \n");
+    vTaskDelay(pdMS_TO_TICKS(10000));
 
-}
-void test_relay_scan()
-{
-  for (int i=0; i<16; i++)
-  {
-    printf("Turning on the bit %d \n", i);
-    vibrate_relay(1<<i);
   }
-
 }
-
-
 
 
 //*************************************************************************** 
@@ -390,10 +342,11 @@ int check_tuning_power()
 {
   printf("Reading ref power \n");
   double ref_power = get_swr();
-  printf("Power for cheking = %f \n", ref_power);
-  if (ref_power >= (double)TUNING_POWER_LIMIT)
+  double fwd_power = get_swr();
+  printf("Power for cheking = %f \n", fwd_power);
+  if (fwd_power >= (double)TUNING_POWER_LIMIT)
     return -1;
-  if (ref_power < (double)TUNING_POWER_LOWER_LIMIT)
+  if (fwd_power < (double)TUNING_POWER_LOWER_LIMIT)
     return 1;
   return 0;
 
@@ -436,7 +389,9 @@ int close_tuning_mode()
 //*************************************************************************** 
 // Function to search lowest ref power
 //*************************************************************************** 
-int search_lowest_SWR(int32_t* val_l, int32_t* val_c, int32_t* val_p, double* val_swr)
+
+
+int search_lowest_SWR(int32_t* val_l, int32_t* val_c, int32_t* val_p, double* val_swr, int debug_display)
 {
 
   double lowest_swr = 1e6;
@@ -449,7 +404,6 @@ int search_lowest_SWR(int32_t* val_l, int32_t* val_c, int32_t* val_p, double* va
 
   int cposition = 0;
 
-  int debug_display = 1;
   //---------------------------------------------------------------------
   // first step, coarse, find lowest setting, and try capacitor on both radio side and antenna side
   // cap position is searched only at the first step
@@ -459,7 +413,9 @@ int search_lowest_SWR(int32_t* val_l, int32_t* val_c, int32_t* val_p, double* va
     for (i_cap = 0; i_cap < RANGE_L; i_cap += STEP_COARSE_SEARCH)
     {
       set_LC(cposition, i_ind, i_cap);
-      swr_A = get_swr_adaptive_settling();
+      vTaskDelay(pdMS_TO_TICKS(RELAY_SETTLING_TIME_COARSE));
+      swr_A  = get_swr();
+
       if (debug_display == 1) {
         sprintf(pline, "Searching, L = %d, C = %d, SWRA = %f \n", i_ind, i_cap, swr_A);
         printf(pline);
@@ -479,7 +435,8 @@ int search_lowest_SWR(int32_t* val_l, int32_t* val_c, int32_t* val_p, double* va
     for (i_cap = 0; i_cap < RANGE_L; i_cap += STEP_COARSE_SEARCH)
     {
       set_LC(cposition, i_ind, i_cap);
-      swr_B = get_swr_adaptive_settling();
+      vTaskDelay(pdMS_TO_TICKS(RELAY_SETTLING_TIME_COARSE));
+      swr_B  = get_swr();
       if (debug_display == 1) {
         sprintf(pline, "Searching, L = %d, C = %d, SWRB = %f \n", i_ind, i_cap, swr_B);
         printf(pline);
@@ -514,7 +471,8 @@ int search_lowest_SWR(int32_t* val_l, int32_t* val_c, int32_t* val_p, double* va
 
   }
   set_LC(cposition, lowest_ind, lowest_cap);
-  swr = get_swr_adaptive_settling();
+  vTaskDelay(pdMS_TO_TICKS(RELAY_SETTLING_TIME_COARSE));
+  swr  = get_swr();
 
   if (debug_display == 1) {
     sprintf(pline, "Coarse search results, L = %d, C = %d, SWR = %f, current SWR = %f \n", lowest_ind, lowest_cap, lowest_swr, swr);
@@ -537,13 +495,15 @@ int search_lowest_SWR(int32_t* val_l, int32_t* val_c, int32_t* val_p, double* va
   //---------------------------------------------------------------------
   // second step, coarse, 
   //---------------------------------------------------------------------
+  lowest_swr = 1e6;
 
   for (i_ind = fine_ind_start; i_ind < fine_ind_stop; i_ind += STEP_MEDIUM_SEARCH)
   {
     for (i_cap = fine_cap_start; i_cap < fine_cap_stop; i_cap += STEP_MEDIUM_SEARCH)
     {
       set_LC(cposition, i_ind, i_cap);
-      swr = get_swr_adaptive_settling();
+      vTaskDelay(pdMS_TO_TICKS(RELAY_SETTLING_TIME_COARSE));
+      swr  = get_swr();
       if (debug_display == 1) {
         sprintf(pline, "Searching, L = %d, C = %d, SWR = %f \n", i_ind, i_cap, swr);
         printf(pline);
@@ -557,7 +517,8 @@ int search_lowest_SWR(int32_t* val_l, int32_t* val_c, int32_t* val_p, double* va
     }
   }
   set_LC(cposition, lowest_ind, lowest_cap);
-  swr = get_swr_adaptive_settling();
+  vTaskDelay(pdMS_TO_TICKS(RELAY_SETTLING_TIME_COARSE));
+  swr  = get_swr();
 
   if (debug_display == 1) {
     sprintf(pline, "Coarse stage 2 search results, L = %d, C = %d, SWR = %f, current SWR = %f \n", lowest_ind, lowest_cap, lowest_swr, swr);
@@ -578,30 +539,34 @@ int search_lowest_SWR(int32_t* val_l, int32_t* val_c, int32_t* val_p, double* va
   fine_cap_stop = lowest_cap + STEP_MEDIUM_SEARCH;
   if (fine_cap_stop > RANGE_C) fine_cap_stop = RANGE_C;
 
-
+  lowest_swr = 1e6;
   for (i_ind = fine_ind_start; i_ind < fine_ind_stop; i_ind += 1)
   {
     for (i_cap = fine_cap_start; i_cap < fine_cap_stop; i_cap += 1)
     {
       set_LC(cposition, i_ind, i_cap);
-      swr = get_swr_adaptive_settling();
-      if (debug_display == 1) {
-          sprintf(pline, "Fine Searching, L = %d, C = %d, SWR = %f \n", i_ind, i_cap, swr);
-          printf(pline);
-      }
+      vTaskDelay(pdMS_TO_TICKS(RELAY_SETTLING_TIME_FINE));
+      swr  = get_swr();
       if (swr < lowest_swr) {
         lowest_ind = i_ind;
         lowest_cap = i_cap;
         lowest_swr = swr;
-
+      }
+      if (debug_display == 1) {
+          sprintf(pline, "Fine Searching, L = %d, C = %d, SWR = %f, Lowest =%f, lowest_i = %d, lowest_c = %d \n", i_ind, i_cap, swr, lowest_swr, lowest_ind, lowest_cap);
+          printf(pline);
       }
     }
   }
 
   set_LC(cposition, lowest_ind, lowest_cap);
-  swr = get_swr_adaptive_settling();
+  vTaskDelay(pdMS_TO_TICKS(RELAY_SETTLING_TIME_FINE));
+  vTaskDelay(pdMS_TO_TICKS(RELAY_SETTLING_TIME_FINE));
+  vTaskDelay(pdMS_TO_TICKS(RELAY_SETTLING_TIME_FINE));
+  swr  = get_swr();
 
   if (debug_display == 1) {
+    swr  = get_swr();
     sprintf(pline, "Fine search results, L = %d, C = %d, SWR = %f, current SWR = %f \n", lowest_ind, lowest_cap, lowest_swr, swr);
     printf(pline);
   }
@@ -611,4 +576,28 @@ int search_lowest_SWR(int32_t* val_l, int32_t* val_c, int32_t* val_p, double* va
   *val_p = cposition;
    
   return 0;
+}
+
+//*************************************************************************** 
+// Test funcitons
+//*************************************************************************** 
+
+int check_fwd_ref_power()
+{
+  for (;;)
+  {
+    printf("Forward power = %f, reflected power = %f \n", read_fwd(), read_ref());
+    vTaskDelay(pdMS_TO_TICKS(1000)); 
+  }
+
+}
+void test_tuning()
+{
+    int32_t mem_val_l[4] = {0};
+    int32_t mem_val_c[4] = {0};
+    int32_t mem_val_p[4] = {0};
+    double swr = 1.0;
+
+    search_lowest_SWR(&mem_val_l[0], &mem_val_c[0], &mem_val_p[0], &swr, 1);
+
 }

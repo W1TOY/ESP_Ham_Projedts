@@ -121,6 +121,8 @@ void app_setup_pcnt(void)
 // functino to measure the pulse counts
 int32_t measure_frequency(void)
 {
+    return 0;       // disable frequency feature for now
+
     int i = 0;
     int32_t mfreq = 0;
 

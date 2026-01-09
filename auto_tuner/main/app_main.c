@@ -69,6 +69,7 @@ int gpio_button[4] = { 0};
 int gpio_lights[4] = {0};
 int last_antenna = 0;
 int32_t last_freq = 0;
+int process_keys = 1;
 
 void process_short_button(int button_num);
 void process_long_button(int button_num);
@@ -328,10 +329,10 @@ void vTaskErrorDisplay(void *pvParameters)
                 gpio_set_level(gpio_lights[antenna], 0);
                 esp_mqtt_client_publish(client, "MY_AUTO_TUNER_1/Tuned", "off", 0, 0, 0);            
             }
-            vTaskDelay(pdMS_TO_TICKS(200));
+            vTaskDelay(pdMS_TO_TICKS(100));
 
         }
-        if (mem_error[antenna] ==2) {
+        else if (mem_error[antenna] ==2) {
             if (error_status ==0) {
                 error_status = 1;
                 gpio_set_level(gpio_lights[antenna], 1);
@@ -343,6 +344,19 @@ void vTaskErrorDisplay(void *pvParameters)
             }
             vTaskDelay(pdMS_TO_TICKS(1000));
         }
+        else if (mem_error[antenna] ==3) {
+            if (error_status ==0) {
+                error_status = 1;
+                gpio_set_level(gpio_lights[antenna], 1);
+                esp_mqtt_client_publish(client, "MY_AUTO_TUNER_1/Tuned", "on", 0, 0, 0);            }
+            else {
+                error_status = 0;
+                gpio_set_level(gpio_lights[antenna], 0);
+                esp_mqtt_client_publish(client, "MY_AUTO_TUNER_1/Tuned", "off", 0, 0, 0);            
+            }
+            vTaskDelay(pdMS_TO_TICKS(1000));
+        }
+
 
         if (client == NULL) continue;
     }
@@ -387,10 +401,12 @@ void make_chan_online_if_calibrated(int ant_num)
         mem_online[ant_num] = 1;
         load_lcvalues(ant_num);                 
         printf("Anttena[%d], LC values are loaded \n",ant_num);
+        mem_error[ant_num] = 0;     // selected but no calibration data
 
     }
     else {
         mem_online[ant_num] = 0;
+        mem_error[ant_num] = 3;     // selected but no calibration data
         bypass_tuning_LC();
         printf("Anttena[%d], LC values are bypassed \n",ant_num);
     }
@@ -408,12 +424,14 @@ void toggle_chan_online_if_calibrated(int ant_num)
             turn_on_antenna_light(-1);
             bypass_tuning_LC();
             printf("Anttena[%d], LC values are bypassed \n",ant_num);
+            mem_error[ant_num] = 3;     // selected but no calibration data
         }
         else {
             mem_online[ant_num] = 1;
             turn_on_antenna_light(ant_num);
             load_lcvalues(ant_num);                 
             printf("Anttena[%d], LC values are loaded \n",ant_num);
+            mem_error[ant_num] = 0;     // selected but no calibration data
 
         }
     }
@@ -422,6 +440,7 @@ void toggle_chan_online_if_calibrated(int ant_num)
         mem_online[antenna] = 0;                                 
         bypass_tuning_LC();
         printf("Anttena[%d], LC values are bypassed \n",ant_num);
+        mem_error[ant_num] = 3;     // selected but no calibration data
     }
 }
 
@@ -443,7 +462,7 @@ void process_short_button(int button_num)
     else {
         toggle_chan_online_if_calibrated(antenna);
     }
-    mem_error[antenna] = 0;
+//    mem_error[antenna] = 0;
 }
 //***************************************************************************** 
 // function to processo long key (button is pressed for longer than one sec)
@@ -456,13 +475,13 @@ void process_short_button(int button_num)
 void process_long_button(int button_num)
 {
     printf("Processing long button ... \n");
-    if (button_num != antenna) {
+    if (button_num != antenna) {    // if calibrated, load the calibrated LC values from the memory
         antenna = button_num;
         make_chan_online_if_calibrated(antenna);
         publish_selected_antenna(antenna);          
         last_freq = -1;
     }
-    else {
+    else {  // if not calibrated, or long button is pressed again
         double swr = 0;
         printf("Set tuning mode.. \n");
         esp_mqtt_client_publish(client, "MY_AUTO_TUNER_1/Tuning", "on", 0, 0, 0);    
@@ -472,50 +491,34 @@ void process_long_button(int button_num)
         int tready = set_tuning_mode();
         if (tready == 0)
         {
-            int32_t tfreq = 0;
             int sresult = 0;
-            printf("Measring frequency ... \n");
-            tfreq = measure_frequency() & FREQ_STEP_MASK;
-            printf("measured frequency = %ld, last used frequency = %ld \n", tfreq, last_freq);
-            if (tfreq != last_freq) {   // if same antenna and frequency is different, then try to read from memory first
-                sresult = read_chan_mem(tfreq, antenna, &mem_val_l[antenna], &mem_val_c[antenna],&mem_val_p[antenna]);
-                if (sresult == 0) {
-                    printf("Read memory sucess = freq = %ld, antenna = %ld, l= %ld, c = %ld, p = %ld \n", tfreq, antenna, mem_val_l[antenna], mem_val_c[antenna], mem_val_p[antenna]);
-                    mem_calibrated[antenna] = 1;
-                    make_chan_online_if_calibrated(antenna);
-                }
+            sresult = search_lowest_SWR(&mem_val_l[antenna], &mem_val_c[antenna], &mem_val_p[antenna], &swr, 0);
+            if (sresult != -1) {
+                printf("Calibrated, antenna = %ld, l= %ld, c = %ld, p = %ld \n", antenna, mem_val_l[antenna], mem_val_c[antenna], mem_val_p[antenna]);
+                mem_calibrated[antenna] = 1;
+                make_chan_online_if_calibrated(antenna);
+                mem_error[antenna] = 0;
             }
-            if (tfreq == last_freq || sresult != 0)
-            {
-                sresult = search_lowest_SWR(&mem_val_l[antenna], &mem_val_c[antenna], &mem_val_p[antenna], &swr);
-                if (sresult != -1) {
-                    last_freq = tfreq;
-                    printf("Calibrated, freq = %ld, antenna = %ld, l= %ld, c = %ld, p = %ld \n", tfreq, antenna, mem_val_l[antenna], mem_val_c[antenna], mem_val_p[antenna]);
-                    mem_calibrated[antenna] = 1;
-                    make_chan_online_if_calibrated(antenna);
-                    mem_error[antenna] = 0;
-                    save_chan_mem(tfreq, antenna, mem_val_l[antenna], mem_val_c[antenna], mem_val_p[antenna]);                 
-                }
-                else {
-                    mem_error[antenna] = 1;            
-                    mem_calibrated[antenna] = 0;
-                    make_chan_online_if_calibrated(antenna);
-                }
+            else {
+                mem_calibrated[antenna] = 0;
+                make_chan_online_if_calibrated(antenna);
+                mem_error[antenna] = 1;             //tuning failure 
             }
-            last_freq = tfreq;
         }
         else if (tready == 1)
         {
             printf("Tuning fails because of too litte power \n");
-            mem_error[antenna] = 2;            
             mem_calibrated[antenna] = 0;
             make_chan_online_if_calibrated(antenna);
+            mem_error[antenna] = 1;     //tuning failure           
+            mem_error[antenna] = 1;             //tuning failure 
         }
         else {
             printf("Tuning fails because of too much power \n");
             mem_error[antenna] = 1;            
             mem_calibrated[antenna] = 0;
             make_chan_online_if_calibrated(antenna);
+            mem_error[antenna] = 1;             //tuning failure 
         }
         close_tuning_mode();
         esp_mqtt_client_publish(client, "MY_AUTO_TUNER_1/Tuning", "off", 0, 0, 0);    
@@ -525,34 +528,51 @@ void process_long_button(int button_num)
 //***************************************************************************** 
 // Task to read GPIO and call the short or long key process function
 //***************************************************************************** 
-static void gpio_task_example(void* arg)
+static void gpio_task_example(void* arg) // change from interrupt to polling, evern 100 msec
 {
     uint32_t button_num;
     int gpio_level = 0;
-    for (;;) {
-        if (xQueueReceive(gpio_evt_queue, &button_num, portMAX_DELAY)) {
-//            printf("button_num = %ld \n", button_num);
-//            printf("GPIO num = %d \n", gpio_button[button_num]);
-            gpio_level = gpio_get_level(gpio_button[button_num]);
-            if (gpio_level == 0) {
-                int i=0;
-                for (i=0; i<100; i++) {
-                    vTaskDelay(pdMS_TO_TICKS(10));
+    int button_status = 0;
+    int short_count = 0;
+    for (;;)
+    {
+        for (;;) {
+            for (button_num=0; button_num<4; button_num++) {
+                gpio_level = gpio_get_level(gpio_button[button_num]);
+                if (gpio_level == 0) {
+                    button_status = 1;
+                    break;
+                }
+            }
+            vTaskDelay(pdMS_TO_TICKS(10));
+            if (button_status == 1) {
+                button_status = 0;
+                short_count = 0;
+                for (;;) {
+                    vTaskDelay(pdMS_TO_TICKS(50));
                     gpio_level = gpio_get_level(gpio_button[button_num]);
-                    if (gpio_level ==1) {
-                        printf("Button[%d] : short press \n", gpio_button[button_num]);
-                        process_short_button(button_num);
+                    if (gpio_level == 1) {
+                        printf("Short key on channel %ld \n", button_num);
+                        if (process_keys ==1) process_short_button(button_num);
                         break;
                     }
+                    short_count++;
+                    if (short_count > 10) break;
                 }
-                if (i>=99) {
-                    printf("Button[%d] : long press \n", gpio_button[button_num]);
-                    process_long_button(button_num);
+                if (gpio_level == 0) {
+                    printf("Long key on channel %ld \n", button_num);
+                    if (process_keys ==1) process_long_button(button_num);
                 }
-
+                for (;;)
+                {
+                    gpio_level = gpio_get_level(gpio_button[button_num]);
+                    if (gpio_level == 1) break;
+                }
+                vTaskDelay(pdMS_TO_TICKS(200));
             }
         }
     }
+
 }
 
 //***************************************************************************** 
@@ -640,20 +660,21 @@ void app_main(void)
     // Relay test
     //*****************************************************
 //    test_relay_lc_scan();
-//    search_lowest_SWR();
+//    check_fwd_ref_power();
+//    test_tuning();
 //    check_signal_level();
 
     //*****************************************************
     // Button test
     //*****************************************************
 #ifdef  BUTTON_TEST
-
+    process_keys = 0;
     for (;;)
     {
         int gpio_input_level = 0;
         printf("\n");                
         gpio_input_level = gpio_get_level((gpio_num_t)GPIO_BUTTON_0);
-        printf("Button 0 input = %d, ", gpio_input_level);
+        printf("Button input = %d, ", gpio_input_level);
         gpio_input_level = !gpio_input_level;
         gpio_set_level((gpio_num_t)GPIO_BUTTON_LIGHT_0, gpio_input_level);
 
