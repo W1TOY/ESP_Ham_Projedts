@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-#define NUM_ADC_READ 32                 // number of ADC read for averaging
+#define NUM_ADC_READ 16                 // number of ADC read for averaging
 #define ADC_CHANNEL_FWD ADC_CHANNEL_0   // this becomes GPIO1 in ESP32
 #define ADC_CHANNEL_REF ADC_CHANNEL_1   // this becomes GPIO2 in ESP32
 
@@ -33,12 +33,14 @@
 #define RANGE_C 128
 #define STEP_COARSE_SEARCH 16   // first step out of three step, L/C values are incremeneted by this
 #define STEP_MEDIUM_SEARCH 4    // second step out of three step, L/C values are incremeneted by this
-#define RELAY_SETTLING_TIME_COARSE 30  // Waiting time before reading ref power after relay switching
-#define RELAY_SETTLING_TIME_FINE 30  // Waiting time before reading ref power after relay switching
 #define RELAY_SETTLING_TIME_MIN 5  // Waiting time before reading ref power after relay switching
 
 #define TUNING_POWER_LIMIT 4000         // tuning won't start if power is higher than this
 #define TUNING_POWER_LOWER_LIMIT 10     // or if lower than this
+
+extern int relay_delay_coarse;
+extern int relay_delay_fine;
+
 
 void setup_gpio_output(int pinnum);
 double read_fwd();

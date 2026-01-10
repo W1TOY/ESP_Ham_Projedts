@@ -48,10 +48,12 @@ int status_bypassed = 0;
 int warning_high_swr = 0;
 
 int print_search_debug = 1;
-int relay_delay = 20;
+int relay_delay_coarse = 30;
+int relay_delay_fine = 30;
 
 int donotstop = 0;
 char xinput;
+
 
 
 
@@ -413,7 +415,7 @@ int search_lowest_SWR(int32_t* val_l, int32_t* val_c, int32_t* val_p, double* va
     for (i_cap = 0; i_cap < RANGE_L; i_cap += STEP_COARSE_SEARCH)
     {
       set_LC(cposition, i_ind, i_cap);
-      vTaskDelay(pdMS_TO_TICKS(RELAY_SETTLING_TIME_COARSE));
+      vTaskDelay(pdMS_TO_TICKS(relay_delay_coarse));
       swr_A  = get_swr();
 
       if (debug_display == 1) {
@@ -435,7 +437,7 @@ int search_lowest_SWR(int32_t* val_l, int32_t* val_c, int32_t* val_p, double* va
     for (i_cap = 0; i_cap < RANGE_L; i_cap += STEP_COARSE_SEARCH)
     {
       set_LC(cposition, i_ind, i_cap);
-      vTaskDelay(pdMS_TO_TICKS(RELAY_SETTLING_TIME_COARSE));
+      vTaskDelay(pdMS_TO_TICKS(relay_delay_coarse));
       swr_B  = get_swr();
       if (debug_display == 1) {
         sprintf(pline, "Searching, L = %d, C = %d, SWRB = %f \n", i_ind, i_cap, swr_B);
@@ -471,7 +473,7 @@ int search_lowest_SWR(int32_t* val_l, int32_t* val_c, int32_t* val_p, double* va
 
   }
   set_LC(cposition, lowest_ind, lowest_cap);
-  vTaskDelay(pdMS_TO_TICKS(RELAY_SETTLING_TIME_COARSE));
+  vTaskDelay(pdMS_TO_TICKS(relay_delay_coarse));
   swr  = get_swr();
 
   if (debug_display == 1) {
@@ -502,7 +504,7 @@ int search_lowest_SWR(int32_t* val_l, int32_t* val_c, int32_t* val_p, double* va
     for (i_cap = fine_cap_start; i_cap < fine_cap_stop; i_cap += STEP_MEDIUM_SEARCH)
     {
       set_LC(cposition, i_ind, i_cap);
-      vTaskDelay(pdMS_TO_TICKS(RELAY_SETTLING_TIME_COARSE));
+      vTaskDelay(pdMS_TO_TICKS(relay_delay_coarse));
       swr  = get_swr();
       if (debug_display == 1) {
         sprintf(pline, "Searching, L = %d, C = %d, SWR = %f \n", i_ind, i_cap, swr);
@@ -517,7 +519,7 @@ int search_lowest_SWR(int32_t* val_l, int32_t* val_c, int32_t* val_p, double* va
     }
   }
   set_LC(cposition, lowest_ind, lowest_cap);
-  vTaskDelay(pdMS_TO_TICKS(RELAY_SETTLING_TIME_COARSE));
+  vTaskDelay(pdMS_TO_TICKS(relay_delay_coarse));
   swr  = get_swr();
 
   if (debug_display == 1) {
@@ -545,7 +547,7 @@ int search_lowest_SWR(int32_t* val_l, int32_t* val_c, int32_t* val_p, double* va
     for (i_cap = fine_cap_start; i_cap < fine_cap_stop; i_cap += 1)
     {
       set_LC(cposition, i_ind, i_cap);
-      vTaskDelay(pdMS_TO_TICKS(RELAY_SETTLING_TIME_FINE));
+      vTaskDelay(pdMS_TO_TICKS(relay_delay_fine));
       swr  = get_swr();
       if (swr < lowest_swr) {
         lowest_ind = i_ind;
@@ -560,9 +562,9 @@ int search_lowest_SWR(int32_t* val_l, int32_t* val_c, int32_t* val_p, double* va
   }
 
   set_LC(cposition, lowest_ind, lowest_cap);
-  vTaskDelay(pdMS_TO_TICKS(RELAY_SETTLING_TIME_FINE));
-  vTaskDelay(pdMS_TO_TICKS(RELAY_SETTLING_TIME_FINE));
-  vTaskDelay(pdMS_TO_TICKS(RELAY_SETTLING_TIME_FINE));
+  vTaskDelay(pdMS_TO_TICKS(relay_delay_fine));
+  vTaskDelay(pdMS_TO_TICKS(relay_delay_fine));
+  vTaskDelay(pdMS_TO_TICKS(relay_delay_fine));
   swr  = get_swr();
 
   if (debug_display == 1) {

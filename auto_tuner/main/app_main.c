@@ -70,6 +70,7 @@ int gpio_lights[4] = {0};
 int last_antenna = 0;
 int32_t last_freq = 0;
 int process_keys = 1;
+int relay_setting_delay = 0;
 
 void process_short_button(int button_num);
 void process_long_button(int button_num);
@@ -362,6 +363,28 @@ void vTaskErrorDisplay(void *pvParameters)
     }
 }
 
+void vTaskSettlingDisplay(void *pvParameters)
+{
+    // number of blinks every 5 sec
+    for (;;) {
+
+        if (relay_setting_delay == 0)
+        {
+            gpio_set_level(gpio_lights[3], 1);
+        } 
+        if (relay_setting_delay > 0) 
+        {
+            for (int i=0; i<relay_setting_delay; i++)
+            {
+                gpio_set_level(gpio_lights[3], 1);
+                vTaskDelay(pdMS_TO_TICKS(50));
+                gpio_set_level(gpio_lights[3], 0);
+                vTaskDelay(pdMS_TO_TICKS(50));
+            }
+        }
+        vTaskDelay(pdMS_TO_TICKS(2000));
+    }
+}
 //***************************************************************************** 
 // GPIO Button handler, control LED lights on each button based MQTT message
 //***************************************************************************** 
@@ -445,6 +468,32 @@ void toggle_chan_online_if_calibrated(int ant_num)
 }
 
 //***************************************************************************** 
+// Use 4th button to change the relay setting time
+//***************************************************************************** 
+void change_relay_setting_delay()
+{
+    relay_setting_delay++;
+    if (relay_setting_delay > 2) relay_setting_delay = 0;
+
+    if (relay_setting_delay == 0)
+    {
+        relay_delay_coarse = 30;
+        relay_delay_fine = 30;
+    }
+    else if (relay_setting_delay == 1)
+    {
+        relay_delay_coarse = 50;
+        relay_delay_fine = 50;
+    }
+    else if (relay_setting_delay == 2)
+    {
+        relay_delay_coarse = 15;
+        relay_delay_fine = 15;
+    }
+
+}
+
+//***************************************************************************** 
 // function to processo short key (button is pressed shorter than one sec)
 // 1. If new antenna is selected
 //     - load relay values if previously calibrated, and LED on (ONLINE)
@@ -453,6 +502,10 @@ void toggle_chan_online_if_calibrated(int ant_num)
 //***************************************************************************** 
 void process_short_button(int button_num)
 {
+    if (button_num == 3) {
+        change_relay_setting_delay();
+        return;
+    }
     if (button_num != antenna) {
         antenna = button_num;
         make_chan_online_if_calibrated(antenna);
@@ -474,6 +527,11 @@ void process_short_button(int button_num)
 //***************************************************************************** 
 void process_long_button(int button_num)
 {
+    if (button_num == 3) {
+        change_relay_setting_delay();
+        return;
+    }
+
     printf("Processing long button ... \n");
     if (button_num != antenna) {    // if calibrated, load the calibrated LC values from the memory
         antenna = button_num;
@@ -732,6 +790,7 @@ void app_main(void)
 
     xTaskCreate( vTaskPeriodic, "Periodic task", 4096, &ucParameterToPass, tskIDLE_PRIORITY, &xHandle );
     xTaskCreate( vTaskErrorDisplay, "Error display task", 4096, &ucParameterToPass, tskIDLE_PRIORITY, &xHandle );
+    xTaskCreate( vTaskSettlingDisplay, "Setting Delay task", 4096, &ucParameterToPass, tskIDLE_PRIORITY, &xHandle );
 
 
 }
