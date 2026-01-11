@@ -477,18 +477,18 @@ void change_relay_setting_delay()
 
     if (relay_setting_delay == 0)
     {
-        relay_delay_coarse = 30;
-        relay_delay_fine = 30;
+        relay_delay_coarse = 15;
+        relay_delay_fine = 15;
     }
     else if (relay_setting_delay == 1)
     {
-        relay_delay_coarse = 50;
-        relay_delay_fine = 50;
+        relay_delay_coarse = 30;
+        relay_delay_fine = 30;
     }
     else if (relay_setting_delay == 2)
     {
-        relay_delay_coarse = 15;
-        relay_delay_fine = 15;
+        relay_delay_coarse = 60;
+        relay_delay_fine = 60;
     }
 
 }

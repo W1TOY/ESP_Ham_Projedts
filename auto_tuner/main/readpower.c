@@ -48,8 +48,8 @@ int status_bypassed = 0;
 int warning_high_swr = 0;
 
 int print_search_debug = 1;
-int relay_delay_coarse = 30;
-int relay_delay_fine = 30;
+int relay_delay_coarse = 15;
+int relay_delay_fine = 15;
 
 int donotstop = 0;
 char xinput;
@@ -119,7 +119,12 @@ double read_fwd()
 
 double get_swr()
 {
-    return read_ref();
+    double ref_power = read_ref();
+    double fwd_power = read_fwd();
+    if (fwd_power == 0) fwd_power = 1;
+    return ref_power / fwd_power;
+
+//    return read_ref();
 }
 
 //**************************************************************************** 
@@ -343,8 +348,8 @@ void test_relay_lc_scan()
 int check_tuning_power()
 {
   printf("Reading ref power \n");
-  double ref_power = get_swr();
-  double fwd_power = get_swr();
+  double ref_power = read_ref();
+  double fwd_power = read_fwd();
   printf("Power for cheking = %f \n", fwd_power);
   if (fwd_power >= (double)TUNING_POWER_LIMIT)
     return -1;
@@ -429,7 +434,9 @@ int search_lowest_SWR(int32_t* val_l, int32_t* val_c, int32_t* val_p, double* va
         lowest_swr_A = swr_A;
       }
     }
+
   }
+
 
   cposition =1;
   for (i_ind = 0; i_ind < RANGE_L; i_ind += STEP_COARSE_SEARCH)
@@ -599,7 +606,36 @@ void test_tuning()
     int32_t mem_val_c[4] = {0};
     int32_t mem_val_p[4] = {0};
     double swr = 1.0;
+    double pwr_fwd = 1.0;
+    double pwr_ref = 1.0;
+
+
+    relay_delay_coarse = 15;
+    relay_delay_fine = 15;
+
 
     search_lowest_SWR(&mem_val_l[0], &mem_val_c[0], &mem_val_p[0], &swr, 1);
+/*    
+  for (int i=0; i<106; i++)
+  {
+    set_LC(0, 0, i);
+    printf("C value = %d ", i);
+        pwr_fwd = read_fwd();
+        pwr_ref = read_ref();
+        printf("Forward power = %f, reflected power = %f, ratio = %f \n", pwr_fwd, pwr_ref, pwr_ref/pwr_fwd);
+    vTaskDelay(pdMS_TO_TICKS(50)); 
+  }
+*/
 
+/*
+    set_LC(0, 0, 32);
+    for (;;)
+    {
+        pwr_fwd = read_fwd();
+        pwr_ref = read_ref();
+        printf("Forward power = %f, reflected power = %f \n", pwr_fwd, pwr_ref);
+        vTaskDelay(pdMS_TO_TICKS(1000)); 
+
+    }
+*/
 }
