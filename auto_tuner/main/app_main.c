@@ -205,29 +205,73 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
         esp_mqtt_client_publish(client, "MY_AUTO_TUNER_1/Tuned", "off", 0, 0, 0);
         esp_mqtt_client_publish(client, "MY_AUTO_TUNER_1/Tuning", "off", 0, 0, 0);
         
-        esp_mqtt_client_subscribe(client, "MY_AUTO_TUNER_1/ANT_SELECT", 0);
-        esp_mqtt_client_subscribe(client, "MY_AUTO_TUNER_1/Beacon", 0);
+//        esp_mqtt_client_subscribe(client, "MY_AUTO_TUNER_1/ANT_SELECT", 0);
+//        esp_mqtt_client_subscribe(client, "MY_AUTO_TUNER_1/Beacon", 0);
 
+        esp_mqtt_client_subscribe(client, "MY_AUTO_TUNER_1/ANT1", 0);
+        esp_mqtt_client_subscribe(client, "MY_AUTO_TUNER_1/ANT2", 0);
+        esp_mqtt_client_subscribe(client, "MY_AUTO_TUNER_1/ANT3", 0);
+        esp_mqtt_client_subscribe(client, "MY_AUTO_TUNER_1/ANT4", 0);
         publish_selected_antenna(antenna);
 
         vTaskDelay(pdMS_TO_TICKS(500));
         break;
     case MQTT_EVENT_DATA:
-//        ESP_LOGI(TAG, "MQTT_EVENT_DATA");
-//        printf("TOPIC=%.*s\r\n", event->topic_len, event->topic);
-//        printf("DATA=%.*s\r\n", event->data_len, event->data);
+        ESP_LOGI(TAG, "MQTT_EVENT_DATA");
+        printf("TOPIC=%.*s\r\n", event->topic_len, event->topic);
+        printf("DATA=%.*s\r\n", event->data_len, event->data);
 
         if (event->topic_len < 1) break;
 
-        if ( strncmp(event->topic, "MY_AUTO_TUNER_1/ANT_SELECT", strlen("MY_AUTO_TUNER_1/ANT_SELECT")) == 0) {
+        if ( strncmp(event->topic, "MY_AUTO_TUNER_1/ANT_SELECT", strlen("MY_AUTO_TUNER_1/ANT_SELECT")) == 0) {            
             if (strncmp(event->data, "on", 2) == 0)
             {
                 esp_mqtt_client_publish(client, "MY_AUTO_TUNER_1/ANT_SELECT", "off", 0, 0, 0);
                 int button_num = antenna;
                 button_num += 1;
-                if (button_num >= 4) button_num = 0;
+                if (button_num >= 3) button_num = 0;
                 process_short_button(button_num);
                 publish_selected_antenna(antenna);            
+            }
+        }
+        else if ( strncmp(event->topic, "MY_AUTO_TUNER_1/ANT1", strlen("MY_AUTO_TUNER_1/ANT2")) == 0) {
+            if (strncmp(event->data, "on", 2) == 0)
+            {
+                if (antenna != 0) {
+                    antenna = 0;
+                    int button_num = antenna;
+                    process_short_button(button_num);
+                    publish_selected_antenna(antenna); 
+                }
+            }
+        }
+        else if ( strncmp(event->topic, "MY_AUTO_TUNER_1/ANT2", strlen("MY_AUTO_TUNER_1/ANT2")) == 0) {
+            if (strncmp(event->data, "on", 2) == 0)
+            {
+                if (antenna != 1) {
+                    antenna = 1;
+                    int button_num = antenna;
+                    process_short_button(button_num);
+                    publish_selected_antenna(antenna);
+                }
+            }
+        }
+        else if ( strncmp(event->topic, "MY_AUTO_TUNER_1/ANT3", strlen("MY_AUTO_TUNER_1/ANT3")) == 0) {
+            if (strncmp(event->data, "on", 2) == 0)
+            {
+                if (antenna != 2) {
+                    antenna = 2;
+                    int button_num = antenna;
+                    process_short_button(button_num);
+                    publish_selected_antenna(antenna);
+                }
+            }
+        }
+        else if ( strncmp(event->topic, "MY_AUTO_TUNER_1/ANT4", strlen("MY_AUTO_TUNER_1/ANT4")) == 0) {
+            if (strncmp(event->data, "on", 2) == 0)
+            {
+                    process_short_button(3);
+                    esp_mqtt_client_publish(client, "MY_AUTO_TUNER_1/ANT4", "off", 0, 0, 0);
             }
         }
         else if ( strncmp(event->topic, "MY_AUTO_TUNER_1/Tune", strlen("MY_AUTO_TUNER_1/Tune")) == 0) {
