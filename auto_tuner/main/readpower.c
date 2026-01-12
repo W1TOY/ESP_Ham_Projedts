@@ -307,6 +307,9 @@ void set_LC(uint32_t cposition, uint32_t valueL, uint32_t valueC)
 void set_LC_adaptive(uint32_t cposition, uint32_t valueL, uint32_t valueC, int delay_ms)
 {
     set_LC(cposition, valueL, valueC);
+    vTaskDelay(pdMS_TO_TICKS(delay_ms));
+    return;
+
     vTaskDelay(pdMS_TO_TICKS(RELAY_SETTLING_TIME_MIN));
 
     double swr_prev = get_swr();
@@ -318,7 +321,7 @@ void set_LC_adaptive(uint32_t cposition, uint32_t valueL, uint32_t valueC, int d
         double swr_curr = get_swr();
         double diff = fabs((swr_curr - swr_prev) / (swr_curr + swr_prev));
 
-        if (diff  < 0.04) break;
+        if (diff  < 0.02) break;
         swr_prev = swr_curr;
     }
 }

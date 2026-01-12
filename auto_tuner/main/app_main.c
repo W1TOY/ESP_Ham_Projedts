@@ -521,7 +521,7 @@ void toggle_chan_online_if_calibrated(int ant_num)
 void change_relay_setting_delay()
 {
     relay_setting_delay++;
-    if (relay_setting_delay > 2) relay_setting_delay = 0;
+    if (relay_setting_delay > 3) relay_setting_delay = 0;
 
     if (relay_setting_delay == 0)
     {
@@ -530,13 +530,18 @@ void change_relay_setting_delay()
     }
     else if (relay_setting_delay == 1)
     {
+        relay_delay_coarse = 20;
+        relay_delay_fine = 20;
+    }
+    else if (relay_setting_delay == 2)
+    {
         relay_delay_coarse = 30;
         relay_delay_fine = 30;
     }
     else if (relay_setting_delay == 2)
     {
-        relay_delay_coarse = 60;
-        relay_delay_fine = 60;
+        relay_delay_coarse = 50;
+        relay_delay_fine = 50;
     }
 
 }
