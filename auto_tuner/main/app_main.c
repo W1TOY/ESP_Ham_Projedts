@@ -204,6 +204,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
         esp_mqtt_client_subscribe(client, "MY_AUTO_TUNER_1/Tune", 0);
         esp_mqtt_client_publish(client, "MY_AUTO_TUNER_1/Tuned", "off", 0, 0, 0);
         esp_mqtt_client_publish(client, "MY_AUTO_TUNER_1/Tuning", "off", 0, 0, 0);
+        esp_mqtt_client_publish(client, "MY_AUTO_TUNER_1/RelayDelay", "off", 0, 0, 0);
         
 //        esp_mqtt_client_subscribe(client, "MY_AUTO_TUNER_1/ANT_SELECT", 0);
 //        esp_mqtt_client_subscribe(client, "MY_AUTO_TUNER_1/Beacon", 0);
@@ -415,14 +416,17 @@ void vTaskSettlingDisplay(void *pvParameters)
         if (relay_setting_delay == 0)
         {
             gpio_set_level(gpio_lights[3], 1);
+            esp_mqtt_client_publish(client, "MY_AUTO_TUNER_1/RelayDelay", "on", 0, 0, 0);
         } 
         if (relay_setting_delay > 0) 
         {
             for (int i=0; i<relay_setting_delay; i++)
             {
                 gpio_set_level(gpio_lights[3], 1);
+                esp_mqtt_client_publish(client, "MY_AUTO_TUNER_1/RelayDelay", "on", 0, 0, 0);
                 vTaskDelay(pdMS_TO_TICKS(50));
                 gpio_set_level(gpio_lights[3], 0);
+                esp_mqtt_client_publish(client, "MY_AUTO_TUNER_1/RelayDelay", "off", 0, 0, 0);
                 vTaskDelay(pdMS_TO_TICKS(50));
             }
         }

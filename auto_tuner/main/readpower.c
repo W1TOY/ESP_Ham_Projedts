@@ -6,6 +6,7 @@
 
 #include <stdio.h>
 #include <inttypes.h>
+#include <math.h>
 #include "esp_wifi.h"
 #include "esp_system.h"
 #include "nvs_flash.h"
@@ -303,6 +304,25 @@ void set_LC(uint32_t cposition, uint32_t valueL, uint32_t valueC)
   transfer_shift_register_output();
 }
 
+void set_LC_adaptive(uint32_t cposition, uint32_t valueL, uint32_t valueC, int delay_ms)
+{
+    set_LC(cposition, valueL, valueC);
+    vTaskDelay(pdMS_TO_TICKS(RELAY_SETTLING_TIME_MIN));
+
+    double swr_prev = get_swr();
+    int elapsed = RELAY_SETTLING_TIME_MIN;
+
+    while (elapsed < delay_ms) {
+        vTaskDelay(pdMS_TO_TICKS(3));
+        elapsed += 3;
+        double swr_curr = get_swr();
+        double diff = fabs((swr_curr - swr_prev) / (swr_curr + swr_prev));
+
+        if (diff  < 0.04) break;
+        swr_prev = swr_curr;
+    }
+}
+
 //*************************************************************************** 
 // Relay test functions
 //*************************************************************************** 
@@ -419,8 +439,7 @@ int search_lowest_SWR(int32_t* val_l, int32_t* val_c, int32_t* val_p, double* va
   {
     for (i_cap = 0; i_cap < RANGE_L; i_cap += STEP_COARSE_SEARCH)
     {
-      set_LC(cposition, i_ind, i_cap);
-      vTaskDelay(pdMS_TO_TICKS(relay_delay_coarse));
+      set_LC_adaptive(cposition, i_ind, i_cap, relay_delay_coarse);
       swr_A  = get_swr();
 
       if (debug_display == 1) {
@@ -443,8 +462,7 @@ int search_lowest_SWR(int32_t* val_l, int32_t* val_c, int32_t* val_p, double* va
   {
     for (i_cap = 0; i_cap < RANGE_L; i_cap += STEP_COARSE_SEARCH)
     {
-      set_LC(cposition, i_ind, i_cap);
-      vTaskDelay(pdMS_TO_TICKS(relay_delay_coarse));
+      set_LC_adaptive(cposition, i_ind, i_cap, relay_delay_coarse);
       swr_B  = get_swr();
       if (debug_display == 1) {
         sprintf(pline, "Searching, L = %d, C = %d, SWRB = %f \n", i_ind, i_cap, swr_B);
@@ -479,8 +497,7 @@ int search_lowest_SWR(int32_t* val_l, int32_t* val_c, int32_t* val_p, double* va
     lowest_swr = lowest_swr_A;
 
   }
-  set_LC(cposition, lowest_ind, lowest_cap);
-  vTaskDelay(pdMS_TO_TICKS(relay_delay_coarse));
+  set_LC_adaptive(cposition, lowest_ind, lowest_cap, relay_delay_coarse);
   swr  = get_swr();
 
   if (debug_display == 1) {
@@ -510,8 +527,7 @@ int search_lowest_SWR(int32_t* val_l, int32_t* val_c, int32_t* val_p, double* va
   {
     for (i_cap = fine_cap_start; i_cap < fine_cap_stop; i_cap += STEP_MEDIUM_SEARCH)
     {
-      set_LC(cposition, i_ind, i_cap);
-      vTaskDelay(pdMS_TO_TICKS(relay_delay_coarse));
+      set_LC_adaptive(cposition, i_ind, i_cap, relay_delay_coarse);
       swr  = get_swr();
       if (debug_display == 1) {
         sprintf(pline, "Searching, L = %d, C = %d, SWR = %f \n", i_ind, i_cap, swr);
@@ -525,8 +541,7 @@ int search_lowest_SWR(int32_t* val_l, int32_t* val_c, int32_t* val_p, double* va
       }
     }
   }
-  set_LC(cposition, lowest_ind, lowest_cap);
-  vTaskDelay(pdMS_TO_TICKS(relay_delay_coarse));
+  set_LC_adaptive(cposition, lowest_ind, lowest_cap, relay_delay_coarse);
   swr  = get_swr();
 
   if (debug_display == 1) {
@@ -553,8 +568,7 @@ int search_lowest_SWR(int32_t* val_l, int32_t* val_c, int32_t* val_p, double* va
   {
     for (i_cap = fine_cap_start; i_cap < fine_cap_stop; i_cap += 1)
     {
-      set_LC(cposition, i_ind, i_cap);
-      vTaskDelay(pdMS_TO_TICKS(relay_delay_fine));
+      set_LC_adaptive(cposition, i_ind, i_cap, relay_delay_fine);
       swr  = get_swr();
       if (swr < lowest_swr) {
         lowest_ind = i_ind;
@@ -568,10 +582,7 @@ int search_lowest_SWR(int32_t* val_l, int32_t* val_c, int32_t* val_p, double* va
     }
   }
 
-  set_LC(cposition, lowest_ind, lowest_cap);
-  vTaskDelay(pdMS_TO_TICKS(relay_delay_fine));
-  vTaskDelay(pdMS_TO_TICKS(relay_delay_fine));
-  vTaskDelay(pdMS_TO_TICKS(relay_delay_fine));
+  set_LC_adaptive(cposition, lowest_ind, lowest_cap, relay_delay_fine * 3);
   swr  = get_swr();
 
   if (debug_display == 1) {

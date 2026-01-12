@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-#define NUM_ADC_READ 16                 // number of ADC read for averaging
+#define NUM_ADC_READ 32                 // number of ADC read for averaging
 #define ADC_CHANNEL_FWD ADC_CHANNEL_0   // this becomes GPIO1 in ESP32
 #define ADC_CHANNEL_REF ADC_CHANNEL_1   // this becomes GPIO2 in ESP32
 
@@ -54,6 +54,7 @@ void send_value_to_shift_registers(uint32_t valueRelay);
 void clear_all_LC_relays();
 void set_LC_relays(uint32_t vRelay);
 void set_LC(uint32_t cposition, uint32_t valueL, uint32_t valueC);
+void set_LC_adaptive(uint32_t cposition, uint32_t valueL, uint32_t valueC, int delay_ms);
 void test_relay_find();
 void enable_shift_register_output();
 void clear_shift_registers();
