@@ -235,17 +235,13 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
                 button_num += 1;
                 if (button_num >= 3) button_num = 0;
                 process_short_button(button_num);
-                publish_selected_antenna(antenna);            
             }
         }
         else if ( strncmp(event->topic, "MY_AUTO_TUNER_1/ANT1", strlen("MY_AUTO_TUNER_1/ANT2")) == 0) {
             if (strncmp(event->data, "on", 2) == 0)
             {
                 if (antenna != 0) {
-                    antenna = 0;
-                    int button_num = antenna;
-                    process_short_button(button_num);
-                    publish_selected_antenna(antenna); 
+                    process_short_button(0);
                 }
             }
         }
@@ -253,10 +249,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
             if (strncmp(event->data, "on", 2) == 0)
             {
                 if (antenna != 1) {
-                    antenna = 1;
-                    int button_num = antenna;
-                    process_short_button(button_num);
-                    publish_selected_antenna(antenna);
+                    process_short_button(1);
                 }
             }
         }
@@ -264,10 +257,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
             if (strncmp(event->data, "on", 2) == 0)
             {
                 if (antenna != 2) {
-                    antenna = 2;
-                    int button_num = antenna;
-                    process_short_button(button_num);
-                    publish_selected_antenna(antenna);
+                    process_short_button(2);
                 }
             }
         }
@@ -691,6 +681,7 @@ static void gpio_task_example(void* arg) // change from interrupt to polling, ev
                 {
                     gpio_level = gpio_get_level(gpio_button[button_num]);
                     if (gpio_level == 1) break;
+                    vTaskDelay(pdMS_TO_TICKS(10));
                 }
                 vTaskDelay(pdMS_TO_TICKS(200));
             }
