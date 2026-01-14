@@ -785,7 +785,7 @@ void app_main(void)
     //*****************************************************
 //    test_relay_lc_scan();
 //    check_fwd_ref_power();
-    test_tuning();
+//    test_tuning();
 //    check_signal_level();
 
     //*****************************************************
