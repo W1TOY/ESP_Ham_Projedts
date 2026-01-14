@@ -97,6 +97,12 @@ double read_ref()
 {
     int aread = 0;
     double aref = 0;
+    for (int i=0; i< NUM_ADC_PRE_READ; i++) { 
+      ESP_ERROR_CHECK(adc_oneshot_read(adc1_handle, ADC_CHANNEL_REF, &aread)); 
+      aref += aread;
+//      printf("each read = %d \n", aread);
+    }
+    aref=0;
     for (int i=0; i< NUM_ADC_READ; i++) { 
       ESP_ERROR_CHECK(adc_oneshot_read(adc1_handle, ADC_CHANNEL_REF, &aread)); 
       aref += aread;
@@ -109,6 +115,12 @@ double read_fwd()
 {
     int aread = 0;
     double aref = 0;
+    for (int i=0; i< NUM_ADC_PRE_READ; i++) { 
+      ESP_ERROR_CHECK(adc_oneshot_read(adc1_handle, ADC_CHANNEL_FWD, &aread)); 
+      aref += aread;
+//      printf("each read = %d \n", aread);
+    }
+    aref = 0;
     for (int i=0; i< NUM_ADC_READ; i++) { 
       ESP_ERROR_CHECK(adc_oneshot_read(adc1_handle, ADC_CHANNEL_FWD, &aread)); 
       aref += aread;
@@ -392,27 +404,11 @@ int set_tuning_mode()
 {
   printf("Setting relays...\n");
   gpio_set_level(GPIO_PTT_SWITCH, 1); // disconnect PTT Switch
-  gpio_set_level(GPIO_RF_BYPASS, 1); // tuning mode
-  set_LC(0, 0, 0);
-
-  printf("Wait for relay settling...\n");
-  vTaskDelay(pdMS_TO_TICKS(200));  
-  if (check_tuning_power() < 0) {
-    gpio_set_level(GPIO_PTT_SWITCH, 0); // disconnect PTT Switch
-    gpio_set_level(GPIO_RF_BYPASS, 0); // tuning mode
-    return -1;
-  }
-  else if (check_tuning_power() > 0) {  // tuning is not required
-    gpio_set_level(GPIO_PTT_SWITCH, 0); // disconnect PTT Switch
-    gpio_set_level(GPIO_RF_BYPASS, 0); // tuning mode
-    return 1;
-  }
   return 0;
 }
 int close_tuning_mode()
 {
   gpio_set_level(GPIO_PTT_SWITCH, 0); // disconnect PTT Switch
-  gpio_set_level(GPIO_RF_BYPASS, 0); // tuning mode
   return 0;
 }
 

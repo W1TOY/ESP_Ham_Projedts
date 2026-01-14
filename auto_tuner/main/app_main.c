@@ -71,6 +71,9 @@ int last_antenna = 0;
 int32_t last_freq = 0;
 int process_keys = 1;
 int relay_setting_delay = 0;
+TaskHandle_t xHandlePeriodic = NULL;
+TaskHandle_t xHandleError = NULL;
+TaskHandle_t xHandleSettling = NULL;
 
 void process_short_button(int button_num);
 void process_long_button(int button_num);
@@ -595,6 +598,7 @@ void process_long_button(int button_num)
     else {  // if not calibrated, or long button is pressed again
         double swr = 0;
         printf("Set tuning mode.. \n");
+
         esp_mqtt_client_publish(client, "MY_AUTO_TUNER_1/Tuning", "on", 0, 0, 0);    
         mem_val_l[antenna] = 0;
         mem_val_c[antenna] = 0;
@@ -603,7 +607,16 @@ void process_long_button(int button_num)
         if (tready == 0)
         {
             int sresult = 0;
-            sresult = search_lowest_SWR(&mem_val_l[antenna], &mem_val_c[antenna], &mem_val_p[antenna], &swr, 0);
+            if (xHandlePeriodic != NULL) vTaskSuspend(xHandlePeriodic);
+            if (xHandleError != NULL) vTaskSuspend(xHandleError);
+            if (xHandleSettling != NULL) vTaskSuspend(xHandleSettling);
+            vTaskDelay(pdMS_TO_TICKS(100));
+            sresult = search_lowest_SWR(&mem_val_l[antenna], &mem_val_c[antenna], &mem_val_p[antenna], &swr, 1);
+            if (xHandlePeriodic != NULL) vTaskResume(xHandlePeriodic);
+            if (xHandleError != NULL) vTaskResume(xHandleError);
+            if (xHandleSettling != NULL) vTaskResume(xHandleSettling);
+
+
             if (sresult != -1) {
                 printf("Calibrated, antenna = %ld, l= %ld, c = %ld, p = %ld \n", antenna, mem_val_l[antenna], mem_val_c[antenna], mem_val_p[antenna]);
                 mem_calibrated[antenna] = 1;
@@ -749,7 +762,7 @@ void app_main(void)
     gpio_isr_handler_add((gpio_num_t)GPIO_BUTTON_3, gpio_isr_handler_0, (void*) 3);
 
     gpio_evt_queue = xQueueCreate(10, sizeof(uint32_t));
-    xTaskCreate(gpio_task_example, "gpio_task_example", 4096, NULL, tskIDLE_PRIORITY, NULL);
+    xTaskCreate(gpio_task_example, "gpio_task_example", 4096, NULL, 5, NULL);
 
 
     ESP_LOGI(TAG, "[APP] Startup..");
@@ -772,7 +785,7 @@ void app_main(void)
     //*****************************************************
 //    test_relay_lc_scan();
 //    check_fwd_ref_power();
-//    test_tuning();
+    test_tuning();
 //    check_signal_level();
 
     //*****************************************************
@@ -841,9 +854,9 @@ void app_main(void)
     // create tasks
     //*****************************************************
 
-    xTaskCreate( vTaskPeriodic, "Periodic task", 4096, &ucParameterToPass, tskIDLE_PRIORITY, &xHandle );
-    xTaskCreate( vTaskErrorDisplay, "Error display task", 4096, &ucParameterToPass, tskIDLE_PRIORITY, &xHandle );
-    xTaskCreate( vTaskSettlingDisplay, "Setting Delay task", 4096, &ucParameterToPass, tskIDLE_PRIORITY, &xHandle );
+    xTaskCreate( vTaskPeriodic, "Periodic task", 4096, &ucParameterToPass, tskIDLE_PRIORITY, &xHandlePeriodic );
+    xTaskCreate( vTaskErrorDisplay, "Error display task", 4096, &ucParameterToPass, tskIDLE_PRIORITY, &xHandleError );
+    xTaskCreate( vTaskSettlingDisplay, "Setting Delay task", 4096, &ucParameterToPass, tskIDLE_PRIORITY, &xHandleSettling );
 
 
 }

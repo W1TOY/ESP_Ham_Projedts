@@ -3,7 +3,8 @@
 
 #include <stdint.h>
 
-#define NUM_ADC_READ 32                 // number of ADC read for averaging
+#define NUM_ADC_PRE_READ 16                 // number of ADC read for averaging
+#define NUM_ADC_READ 64                 // number of ADC read for averaging
 #define ADC_CHANNEL_FWD ADC_CHANNEL_0   // this becomes GPIO1 in ESP32
 #define ADC_CHANNEL_REF ADC_CHANNEL_1   // this becomes GPIO2 in ESP32
 
