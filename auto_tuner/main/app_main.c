@@ -203,19 +203,16 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
     case MQTT_EVENT_CONNECTED:
         ESP_LOGI(TAG, "MQTT_EVENT_CONNECTED");
 
-        esp_mqtt_client_subscribe(client, "MY_AUTO_TUNER_1/Bypass", 0);
-        esp_mqtt_client_subscribe(client, "MY_AUTO_TUNER_1/Tune", 0);
+//        esp_mqtt_client_subscribe(client, "MY_AUTO_TUNER_1/Bypass", 0);
+//        esp_mqtt_client_subscribe(client, "MY_AUTO_TUNER_1/Tune", 0);
         esp_mqtt_client_publish(client, "MY_AUTO_TUNER_1/Tuned", "off", 0, 0, 0);
         esp_mqtt_client_publish(client, "MY_AUTO_TUNER_1/Tuning", "off", 0, 0, 0);
         esp_mqtt_client_publish(client, "MY_AUTO_TUNER_1/RelayDelay", "off", 0, 0, 0);
         
-//        esp_mqtt_client_subscribe(client, "MY_AUTO_TUNER_1/ANT_SELECT", 0);
-//        esp_mqtt_client_subscribe(client, "MY_AUTO_TUNER_1/Beacon", 0);
-
-        esp_mqtt_client_subscribe(client, "MY_AUTO_TUNER_1/ANT1", 0);
-        esp_mqtt_client_subscribe(client, "MY_AUTO_TUNER_1/ANT2", 0);
-        esp_mqtt_client_subscribe(client, "MY_AUTO_TUNER_1/ANT3", 0);
-        esp_mqtt_client_subscribe(client, "MY_AUTO_TUNER_1/ANT4", 0);
+//        esp_mqtt_client_subscribe(client, "MY_AUTO_TUNER_1/ANT1", 0);
+//        esp_mqtt_client_subscribe(client, "MY_AUTO_TUNER_1/ANT2", 0);
+//        esp_mqtt_client_subscribe(client, "MY_AUTO_TUNER_1/ANT3", 0);
+//        esp_mqtt_client_subscribe(client, "MY_AUTO_TUNER_1/ANT4", 0);
         publish_selected_antenna(antenna);
 
         vTaskDelay(pdMS_TO_TICKS(500));
